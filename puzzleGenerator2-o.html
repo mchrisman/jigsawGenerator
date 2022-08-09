@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Solid Piece Puzzle Generator</title>
+</head>
+<body>
+
+<!-- https://codebeautify.org/minify-js -->
+
+
+    <script>
+
+        function mulberry32(t){return function(){var e=t+=1831565813;return e=Math.imul(e^e>>>15,1|e),(((e^=e+Math.imul(e^e>>>7,61|e))^e>>>14)>>>0)/4294967296}}let rand=mulberry32(85327398),fizz=t=>(2*rand()-1)*t,nextInt=t=>Math.floor(rand()*t);class Point{constructor(t,e){this.x=t,this.y=e}to(t,e){return new Point(this.x*(1-e)+t.x*e,this.y*(1-e)+t.y*e)}minus(t){return new Point(this.x-t.x,this.y-t.y)}plus(t){return new Point(this.x+t.x,this.y+t.y)}distance(t){return Math.sqrt((this.x-t.x)*(this.x-t.x)+(this.y-t.y)*(this.y-t.y))}moveAtAngle(t,e){return new Point(this.x+Math.cos(t)*e,this.y+Math.sin(t)*e)}static normalizeRelativeTo(t,e){return n=>(n=>{let r=-Math.atan2(e.y-t.y,e.x-t.x);return new Point(Math.cos(r)*n.x-Math.sin(r)*n.y,Math.sin(r)*n.x+Math.cos(r)*n.y)})((n=>new Point(n.x/t.distance(e),n.y/t.distance(e)))((e=>e.minus(t))(n)))}static transformRelativeTo(t,e){return n=>(e=>e.plus(t))((n=>new Point(n.x*t.distance(e),n.y*t.distance(e)))((n=>{let r=Math.atan2(e.y-t.y,e.x-t.x);return new Point(Math.cos(r)*n.x-Math.sin(r)*n.y,Math.sin(r)*n.x+Math.cos(r)*n.y)})(n)))}}class Corner extends Point{constructor(t,e,n,r){super(t,e),this.hAngle=n,this.vAngle=r}}class Cubic{constructor(t,e,n,r){this.a=t,this.b=e,this.c=n,this.d=r}split(t){let e=this.a,n=this.b,r=this.c,i=this.d,a=e.to(n,t),s=r.to(i,t),l=n.to(r,t),o=a.to(l,t),h=l.to(s,t),u=o.to(h,t);return[new Cubic(e,a,o,u),new Cubic(u,h,s,i)]}split2(t,e){let n=this.split(t),r=n[0],i=n[1].split((e-t)/(1-t));return[r,i[0],i[1]]}}let bumpSizeMultiplier=1.5;class Edge{constructor(t,e,n,r,i){let a=t.distance(e),s=bumpSizeMultiplier*(1-.25*i),l=.15*s,o=.005*s,h=t.moveAtAngle(n,a*(.35+fizz(.167*i))),u=e.moveAtAngle(Math.PI+r,a*(.35+fizz(.167*i))),d=new Cubic(t,h,u,e),y=.5+fizz(.15*i),c=l+fizz(i*o);c/=a;let x=y-c/2,$=y+c/2,m=d.split2(x,$),g=m[0].a,v=m[0].b,w=m[0].c,f=m[0].d,p=m[1].b,P=m[1].c,z=m[1].d,M=m[2].b,b=m[2].c,E=m[2].d,I=rand()>.5?1:-1,A=fizz(.25*i),C=rand()*i*.2,B=new Point(0+A-.05-C,I+fizz(.25*i)),S=new Point(1+A+.05+C,I+fizz(.25*i)),k=Point.transformRelativeTo(f,z),T=k(B),L=k(S),R=Edge.smartHandles(f,T,L),j=Edge.smartHandles(T,L,z),H=R[0],F=R[1],U=j[0],q=j[1];this.start=`M ${g.x},${g.y}`,this.reverseStart=`M ${E.x},${E.y}`,this.curve=`\nC ${v.x},${v.y} ${w.x},${w.y} ${f.x},${f.y} \nC ${p.x},${p.y} ${H.x},${H.y} ${T.x},${T.y} \nC ${F.x},${F.y} ${U.x},${U.y} ${L.x},${L.y} \nC ${q.x},${q.y} ${P.x},${P.y} ${z.x},${z.y} \nC ${M.x},${M.y} ${b.x},${b.y} ${E.x},${E.y} `,this.reverseCurve=`\nC ${b.x},${b.y} ${M.x},${M.y} ${z.x},${z.y} \nC ${P.x},${P.y} ${q.x},${q.y} ${L.x},${L.y} \nC ${U.x},${U.y} ${F.x},${F.y} ${T.x},${T.y} \nC ${H.x},${H.y} ${p.x},${p.y} ${f.x},${f.y} \nC ${w.x},${w.y} ${v.x},${v.y} ${g.x},${g.y} `}drawEdge2(t,e){return e?t?this.reverseStart+this.reverseCurve:this.reverseCurve:t?this.start+this.curve:this.curve}static smartHandles(t,e,n){let r=1/4,i=Point.normalizeRelativeTo(t,n),a=Point.transformRelativeTo(t,n),s=i(e),l=Math.min(r,2*s.x*r),o=Math.min(r,2*(1-s.x)*r),h=new Point(s.x-l,s.y),u=new Point(s.x+o,s.y);return h=a(h),u=a(u),[h,u]}}function run(){let t=parseInt(document.getElementById("width").value),e=parseInt(document.getElementById("height").value),n=parseFloat(document.getElementById("jitter").value),r=parseInt(document.getElementById("seed").value),i=document.getElementById("style").value;bumpSizeMultiplier=document.getElementById("bumpSizeMultiplier").value,rand=mulberry32(r);let a=Math.PI/6,s=Array(t+1),l=Array(t),o=Array(t);for(let r=0;r<=t;r++){s[r]=Array(e+1);for(let i=0;i<=e;i++){let l=0,o=0,h=r,u=i;r>0&&r<t&&(o=Math.PI/2+fizz(n*a),h+=fizz(.15*n)),i>0&&i<e&&(l=fizz(n*a),u+=fizz(.15*n)),s[r][i]=new Corner(h,u,l,o)}}for(let r=0;r<t;r++){l[r]=Array(e),o[r]=Array(e);for(let t=0;t<e;t++)t>0&&(l[r][t]=new Edge(s[r][t],s[r+1][t],s[r][t].hAngle,s[r+1][t].hAngle,n)),r>0&&(o[r][t]=new Edge(s[r][t],s[r][t+1],s[r][t].vAngle,s[r][t+1].vAngle,n))}let h=`<svg id="theSvg" width="100%"  viewBox = "0 0 ${t} ${e}"\n      version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">`;vPath=(e,n,r,i)=>0===e||e===t?drawStraight(s[e][n],s[e][n+1],r,i):o[e][n].drawEdge2(r,i),hPath=(t,n,r,i)=>0===n||n===e?drawStraight(s[t][n],s[t+1][n],r,i):l[t][n].drawEdge2(r,i),drawStraight=(t,e,n,r)=>r?drawStraight(e,t,n,!1):n?`M${t.x}, ${t.y} L${e.x}, ${e.y}`:`L${e.x},${e.y}`,toPath=(t,e)=>`<path d="${t}" style="fill:${e};stroke:rgb(0,15,255);stroke-width:0.01;"/> `;let u="";if("solid"===i)for(let n=0;n<t;n++)for(let t=0;t<e;t++){let e=hPath(n,t,!0,!1)+vPath(n+1,t,!1,!1)+hPath(n,t+1,!1,!0)+vPath(n,t,!1,!0),r="rgb("+(250-nextInt(30))+","+(250-nextInt(30))+","+(250-nextInt(30))+")";u+=toPath(e,r)}if("edges"===i){for(let n=0;n<t;n++)for(let t=0;t<e;t++)u+=toPath(hPath(n,t,!0,!1),"none"),u+=toPath(vPath(n,t,!0,!1),"none");for(let n=0;n<t;n++){u+=toPath(hPath(n,e,!0,!1),"none")}for(let n=0;n<e;n++){u+=toPath(vPath(t,n,!0,!1),"none")}}h+=u,h+="</svg>",document.getElementById("output").innerHTML=h,document.getElementById("pieceCount").innerText=t*e,document.getElementById("jitterWarning").innerHTML=n>.5||bumpSizeMultiplier>1.5?"⚠️ High distortion or bump size may create crossed lines or delicate pieces.":"&nbsp;"}function changeJitter(t){let e=document.getElementById("jitter");e.value=t+parseFloat(e.value),run()}function init(){document.getElementById("saveButton").addEventListener("click",(()=>{let t=document.getElementById("theSvg"),e=(new XMLSerializer).serializeToString(t),n=new Blob([e],{type:"image/svg+xml;charset=utf-8"});((t,e)=>{let n=document.createElement("a");n.setAttribute("download","jigsaw.svg"),n.setAttribute("href",t),n.setAttribute("target","_blank"),n.click()})(URL.createObjectURL(n))})),document.getElementById("seed").value=1e6+Math.floor(8999999*Math.random()),run()}
+    
+    </script>
+
+
+    Mode: <select name="style" id="style" onchange="run()">
+        <option value="edges">Edges (1-dimensional edges for cutting)</option>
+        <option selected="1" value="solid">Pieces (2-dimensional solid pieces with outlines)</option>
+    </select>
+    <div style="column-count: 2">
+        <div style="break-inside: avoid-column">
+            <div>Width:
+                <input type="number" min=2 max=100 name="width" id="width" value="8" onchange="run()"/>
+            </div>
+            <div>Height:
+                <input type="number" min=2 max="100" name="height" id="height" value="10" onchange="run()"/>
+            </div>
+            <div>
+                Pieces: <b id="pieceCount"></b>
+            </div>
+
+
+        </div>
+        <div>Bump size:
+            <input type="range" min="1" max="1.8" step="0.001"
+                   name="bumpSizeMultiplier" id="bumpSizeMultiplier" value="1.5" onmousemove="run()" onchange="run()"/>
+        </div>
+
+        <div>Distortion:
+            <input type="range" min="0" max="1" step="0.001"
+                   name="jitter" id="jitter" value="0.5" onmousemove="run()" onchange="run()"/>
+        </div>
+
+
+        <div>Seed: <input type="number" min="1000000" max="9999999" name="seed" id="seed" value="1234567"
+                          onChange="run()"/>
+            <button onclick="document.getElementById('seed').value=1000000+Math.floor(Math.random()*8999999);run()">
+                Randomize
+            </button>
+        </div>
+    </div>
+
+    <hr/>
+    <button id="saveButton" style="font-size: 120%; font-weight:bold">Save SVG file</button>
+    <span id="jitterWarning" style="color:red; "></span>
+
+    <div id="output"></div>
+
+
+    <script>
+        init()
+    </script>
+</body>
+</html>
