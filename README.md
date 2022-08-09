@@ -2,3 +2,10 @@ Things helpful for creating SVG jigsaw patterns that are solid pieces (each piec
 
 * A [SVG jigsaw puzzle pattern generator that can produce solid pieces](puzzleGenerator2-o.html) (i.e. closed outlines) rather than just edges.
 
+* Other patterns (public domain):
+
+<div>
+<object data='deco-1000-pattern.svg' type='image/svg+xml'></object>
+</div>
+
+
