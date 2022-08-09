@@ -4,8 +4,5 @@ Things helpful for creating SVG jigsaw patterns that are solid pieces (each piec
 
 * Other patterns (public domain):
 
-<div>
-<object data='deco-1000-pattern.svg' type='image/svg+xml'></object>
-</div>
-
-
+    * [deco-1000-pattern.svg](deco-1000-pattern.svg)
+    
