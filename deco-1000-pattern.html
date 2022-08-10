@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Deco-1000-pattern</title>
+</head>
+<body>
+<script>
+    function init() {
+        //https://stackoverflow.com/questions/31359539/saving-inline-svg-as-a-image-file
+        let triggerDownload = (imgURI, fileName) => {
+            let a = document.createElement('a')
+            a.setAttribute('download', 'jigsaw.svg')
+            a.setAttribute('href', imgURI)
+            a.setAttribute('target', '_blank')
+            a.click()
+        }
+        let save = () => {
+            let svg = document.getElementById('theSvg')
+            let data = (new XMLSerializer()).serializeToString(svg)
+            let svgBlob = new Blob([data], {type: 'image/svg+xml;charset=utf-8'})
+            let url = URL.createObjectURL(svgBlob)
+            triggerDownload(url)
+        }
+        document.getElementById('saveButton').addEventListener('click', save);
+    }
+</script>
+
+To save this SVG pattern, right-click on it and choose "Save".
+<img width="100%" src="deco-1000-pattern.svg"/>
+
+<script>
+    init()
+</script>
+
+</body>
+</html>
