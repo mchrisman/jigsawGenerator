@@ -2,7 +2,7 @@ Things helpful for creating SVG jigsaw patterns in the form of 2-dimensional clo
 
 ## Generator
 
-A [SVG jigsaw puzzle pattern generator that can produce solid pieces](puzzleGenerator2-o.html)</a> (i.e. closed outlines) rather than just edges.
+A [SVG jigsaw puzzle pattern generator that can produce solid pieces](puzzleGenerator2-o.html) (i.e. closed outlines) rather than just edges.
 
 ## Handcrafted 2-dimensional patterns (free for use)
 
