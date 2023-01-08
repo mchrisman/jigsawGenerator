@@ -10,10 +10,10 @@ Things helpful for creating SVG jigsaw patterns in the form of 2-dimensional clo
 
 <img src="irregular-115.svg" width="50%"/>
 
-### "Deco" style, 190 pieces
+### "Deco" style, 190 pieces <a href="deco-190-pattern.svg" download>(Download)</a>
 
 <img src="deco-190-pattern.svg" width="50%"/>
 
-### "Deco" style, 620 pieces
+### "Deco" style, 620 pieces <a href="deco-620-pattern.svg" download>(Download)</a>
 
 <img src="deco-620-pattern.svg" width="70%"/>
