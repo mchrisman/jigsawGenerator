@@ -17,3 +17,7 @@ Things helpful for creating SVG jigsaw patterns in the form of 2-dimensional clo
 ### "Deco" style, 620 pieces <a href="deco-620-pattern.svg" download>(Download)</a>
 
 <img src="deco-620-pattern.svg" width="70%"/>
+
+## See also
+
+[Adjusting for kerf in laser-cut jigsaws](https://mchrisman.github.io/zero-kerf-laser-jigsaw/)
