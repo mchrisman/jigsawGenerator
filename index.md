@@ -1,12 +1,14 @@
 Things helpful for creating SVG jigsaw patterns in the form of 2-dimensional closed-loop pieces (rather than 1-dimensional edge paths).  These are useful for workflows where you are cutting individual pieces.
 
-## Generator
+## Random Generator
 
-[An SVG jigsaw puzzle pattern generator that can produce 2-dimensional closed-loop pieces](puzzleGenerator2-o.html).
+### Checkerboard style (example output) [(Go to the generator)](puzzleGenerator2-o.html)
+
+<img src="demo-generated.svg" width="50%"/>
 
 ## Handcrafted 2-dimensional patterns (free for use)
 
-### Irregular 115 pieces with whimsies <a href="irregular-115.svg" download>(Download)</a>
+### Irregular, 115 pieces with whimsies <a href="irregular-115.svg" download>(Download)</a>
 
 <img src="irregular-115.svg" width="50%"/>
 
