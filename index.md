@@ -6,16 +6,14 @@ A [SVG jigsaw puzzle pattern generator that can produce solid pieces](puzzleGene
 
 ## Handcrafted 2-dimensional patterns (free for use)
 
-**To download, right-click and "save":**
-
-### [Irregular 115 pieces with whimsies](irregular-115.svg)
+### Irregular 115 pieces with whimsies <a href="irregular-115.svg" download>(Download)</a>
 
 <img src="irregular-115.svg" width="50%"/>
 
-### ["Deco" style, 190 pieces](deco-190-pattern.svg)
+### "Deco" style, 190 pieces
 
 <img src="deco-190-pattern.svg" width="50%"/>
 
-### ["Deco" style, 620 pieces](deco-620-pattern.svg)
+### "Deco" style, 620 pieces
 
 <img src="deco-620-pattern.svg" width="70%"/>
