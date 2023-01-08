@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="MavenRunner">
-    <option name="skipTests" value="true" />
-  </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" default="true" project-jdk-name="1.8" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
-  </component>
-  <component name="ScalaCompilerConfiguration">
-    <option name="dynamics" value="true" />
-    <option name="postfixOps" value="true" />
-    <option name="reflectiveCalls" value="true" />
-    <option name="implicitConversions" value="true" />
-    <option name="higherKinds" value="true" />
-    <option name="existentials" value="true" />
-    <option name="macros" value="true" />
   </component>
   <component name="VssConfiguration">
     <option name="CLIENT_PATH" value="" />
