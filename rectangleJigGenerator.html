@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flip-rectangle jig generator</title>
+</head>
+<body>
+<form id="svgForm">
+    <div>
+        <label for="unit">Unit:</label>
+        <select id="unit" name="unit">
+            <option value="pixels">Pixels</option>
+            <option value="inches">Inches</option>
+            <option value="millimeters">Millimeters</option>
+        </select>
+    </div>
+    <div>
+        <label for="width">Width:</label>
+        <input type="number" id="width" name="width" min="1" required>
+    </div>
+    <div>
+        <label for="height">Height:</label>
+        <input type="number" id="height" name="height" min="1" required>
+    </div>
+    <div>
+        <label for="height">Kerf:</label>
+        <input type="number" id="kerf" name="kerf" min="0" required>
+    </div>
+    <br/>
+    <div>
+        <label for="dpi">DPI:</label>
+        <input type="number" id="dpi" name="dpi" min="1" value="96" required>
+        (use 96 for Glowforge/Inkscape, 72 for Affinity Designer)
+    </div>
+    <div>
+        <button type="button" onclick="downloadSVG()">Download SVG</button>
+    </div>
+</form>
+
+<script>
+    function downloadSVG() {
+        var width = document.getElementById('width').value;
+        var height = document.getElementById('height').value;
+        var dpi = document.getElementById('dpi').value;
+        var kerf = document.getElementById('kerf').value;
+        var unit = document.getElementById('unit').value;
+
+        if (width <= 0 || height <= 0 ||  kerf < 0 ||  dpi < 0 
+            || isNaN(dpi) ||isNaN(kerf) ||isNaN(width) || isNaN(height)) {
+            alert('Width, Height, Kerf, DPI must be positive numbers.');
+            return;
+        }
+
+        var W, H, K;
+        switch (unit) {
+            case 'inches':
+                W = width * dpi;
+                H = height * dpi;
+                K = kerf * dpi;
+                break;
+            case 'millimeters':
+                W = width * dpi / 25.4;
+                H = height * dpi / 25.4;
+                K = kerf * dpi / 25.4;
+                break;
+            default: // pixels
+                W = width;
+                H = height;
+                K = kerf;
+        }
+        
+        /*
+        
+        var w=(W-2*K)/9;
+        var h=(H-2*K)/9;
+        var k=K;
+        var path=`M ${ k } ${ k } `
+                 +`h ${ w } `
+                 +`v ${ -k } `
+                 +`h ${ w } `
+                 +`v ${ k } `
+                 +`h ${ 3*w } `
+                 +`v ${ -k } `
+                 +`h ${ w } `
+                 +`v ${ k } `
+                 +`h ${ 3*w } `
+                 
+                 +`v ${ h } `
+                 +`h ${ k } `
+                 +`v ${ h } `
+                 +`h ${ -k } `
+                 +`v ${ 3*h } `
+                 +`h ${ k } `
+                 +`v ${ h } `
+                 +`h ${ -k } `
+                 +`v ${ 3*h } `
+                 
+                 +`h ${ -w } `
+                 +`v ${ k } `
+                 +`h ${ -w } `
+                 +`v ${ -k } `
+                 +`h ${ -3*w } `
+                 +`v ${ k } `
+                 +`h ${ -w } `
+                 +`v ${ -k } `
+                 +`h ${ -3*w } `
+                 
+                 +`v ${ -h } `
+                 +`h ${ -k } `
+                 +`v ${ -h } `
+                 +`h ${ k } `
+                 +`v ${ -3*h } `
+                 +`h ${ -k } `
+                 +`v ${ -h } `
+                 +`h ${ k } `
+                 +`v ${ -3*h } `;
+        
+         */
+
+        var w=(W-2*K)/5.25;
+        var h=(H-2*K)/5.25;
+        var k=K;
+        var path=`M ${ k } ${ k } `
+                 +`h ${ w /4} `
+                 +`v ${ -k } `
+                 +`h ${ w } `
+                 +`v ${ k } `
+                 +`h ${ w * 3/2 } `
+                 +`v ${ -k } `
+                 +`h ${ w } `
+                 +`v ${ k } `
+                 +`h ${ w * 3/2} `
+
+                 +`v ${ h /4} `
+                 +`h ${ k } `
+                 +`v ${ h } `
+                 +`h ${ -k } `
+                 +`v ${ h * 3/2 } `
+                 +`h ${ k } `
+                 +`v ${ h } `
+                 +`h ${ -k } `
+                 +`v ${ h * 3/2} `
+
+                 +`h ${ -w /4} `
+                 +`v ${ k } `
+                 +`h ${ -w } `
+                 +`v ${ -k } `
+                 +`h ${ -w * 3/2 } `
+                 +`v ${ k } `
+                 +`h ${ -w } `
+                 +`v ${ -k } `
+                 +`h ${ -w * 3/2} `
+
+                 +`v ${ -h /4} `
+                 +`h ${ -k } `
+                 +`v ${ -h } `
+                 +`h ${ k } `
+                 +`v ${ -h * 3/2 } `
+                 +`h ${ -k } `
+                 +`v ${ -h } `
+                 +`h ${ k } `
+                 +`v ${ -h * 3/2} `;
+
+
+
+        var svgContent = `<svg width='${W}' height='${H}'><path d="${path}" stroke-width="${K}" stroke="black" fill="none" /></svg>`;
+
+        // Do the download
+        var blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+        var link = document.createElement('a');
+        link.setAttribute('download', 'rectangleJig.svg');
+        link.setAttribute('href', window.URL.createObjectURL(blob));
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+</body>
+</html>
