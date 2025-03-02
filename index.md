@@ -23,4 +23,6 @@ Things helpful for creating SVG jigsaw patterns in the form of 2-dimensional clo
 ## See also
 
 [SVG Warping tool](warp.html)
+
+
 [Adjusting for kerf in laser-cut jigsaws](https://mchrisman.github.io/zero-kerf-laser-jigsaw/)
