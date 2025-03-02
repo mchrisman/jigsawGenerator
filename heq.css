@@ -1,0 +1,45 @@
+ .heq-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.7em;
+            padding: 1em;
+            min-width: fit-content;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .heq-controls {
+            display: flex;
+            gap: 1em;
+            justify-content: center;
+        }
+
+        .heq-control-btn {
+            border: none;
+            background: none;
+            font-size: 1.5em;
+            padding: 0;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .heq-sliders {
+            display: flex;
+            align-items: center;
+            transition: gap 0.3s linear;
+        }
+
+        .heq-slider-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .heq-slider-wrap input[type="range"] {
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+            appearance: slider-vertical;
+            width: 0.7em;
+            height: 7em;
+        }

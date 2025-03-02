@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SVG Random Warper</title>
+    <script src="./flatten.js"></script>
+    <link rel="stylesheet" type="text/css" href="./heq.css">
+    <script src="./heq.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        body {
+            display: grid;
+            grid-template-rows: 400px 1fr;
+            font-family: sans-serif;
+        }
+        p {
+            margin-top:1rem;
+            margin-bottom:1rem;
+        }
+        .top {
+            padding: 1rem;
+            background: #f0f0f0;
+            width: 100%;
+            height: 400px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        .bottom {
+            border: 2px dashed #ccc;
+            display: grid;
+            place-items: center;
+            overflow: hidden;
+            transition: background-color 0.2s, border-color 0.2s;
+            position: relative;
+        }
+
+        .bottom.dragover {
+            border-color: #007BFF;
+            background-color: #e0f0ff;
+        }
+
+        #svgWrapper {
+            transform-origin: center center;
+        }
+
+        #svgWrapper svg {
+            display: block;
+        }
+
+        .layout {
+        }
+
+        #dropZone {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .controls-disabled {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        label {
+            display: block;
+        }
+
+
+        #svgContainer {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+
+        td {
+            padding: .3em;
+            border: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-button {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            padding: 0.6em 1em;
+            background: linear-gradient(to bottom, #fff 0%, #f0f0f0 100%);
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            min-width: 140px;
+            justify-content: space-between;
+        }
+
+        .toggle-button.pressed {
+            background: linear-gradient(to bottom, #e8e8e8 0%, #f0f0f0 100%);
+            border-color: #999;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .toggle-button input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .checkmark {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .toggle-button.pressed .checkmark {
+            opacity: 1;
+        }
+        
+        .control-box {
+            padding: 1em;
+            background: #f5f5f5;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1em;
+        }
+        
+        .controls-container {
+            display: flex;
+            gap: 2em;
+            margin: 1em 0;
+        }
+
+        .controls-left {
+            flex: 1;
+            width: 33%;
+        }
+
+        .controls-middle {
+            flex: 1;
+            width: 33%;
+        }
+
+        .controls-right {
+            flex: 1;
+            width: 33%;
+        }
+
+        #downloadButton {
+            margin-top: 0.5em;
+            width: fit-content;
+        }
+
+        #downloadButton:hover {
+            background: linear-gradient(to bottom, #f0f0f0 0%, #e8e8e8 100%);
+            border-color: #999;
+        }
+        
+</style>
+</head>
+<body>
+
+
+
+
+
+<div class="top">
+     
+    <div class="controls-container">
+            <div class="controls-left">
+                <h1>SVG warper</h1>
+                <p>This tool can only handle simple SVGs.  No embedded images.</p>
+                <label class="toggle-button" style="position:relative;">
+                    Upload SVG
+                    <input type="file" id="fileInput" accept=".svg"/>
+                </label>
+
+                <p>
+                <label class="toggle-button">Download warped SVG
+                    <input type="button" id="downloadButton"></input>
+                </label>
+                </p>
+            </div>
+
+            <div class="controls-middle">
+                <div class="control-box">
+                    <h2>Frequency EQ</h2>
+                <p>
+                    <strong>Warp your SVG</strong> using these equalizer controls. Left knobs control larger features,
+                    right knobs smaller. Click the lock to link them.
+                </p>
+                <div  id="equalizer"></div>
+                </div>
+            </div>
+
+            <div class="controls-right">
+                <div class="control-box">
+                    <h2>Options</h2>
+                    <button id="randomizeSeed" class="toggle-button">
+                        Seed: <span id="seedDisplay" style="padding-left:1em"></span>
+                    </button>
+                    <label class="toggle-button">
+                        <input type="checkbox" id="preservePerimeter" checked>
+                        Fix perimeter
+                        <span class="checkmark" style="padding-left:1em">✅</span>
+                    </label>
+                </div>
+
+            </div>
+        </div>
+    
+
+
+</div>
+
+
+
+
+<div class="bottom" id="dropZone">
+    Drag & Drop SVG file here
+</div>
+
+
+
+<!-- DRAG AND DROP; LOADING AND SIZING SVG. This originally came from test-files/demo-layout.html -->
+<script>
+
+
+    const dropZone = document.getElementById('dropZone');
+    let svgWrapper = null;
+    let naturalWidth = 0, naturalHeight = 0;
+    let viewBox = null;
+
+    // Prevent default drag behaviors on dropZone
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+        dropZone.addEventListener(evt, e => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    dropZone.addEventListener('dragover', () => {
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        dropZone.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            const file = files[0];
+            if (file.type === 'image/svg+xml' || file.name.endsWith('.svg')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    loadSVG(event.target.result);
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please drop a valid SVG file.');
+            }
+        }
+    });
+
+    function loadSVG(svgText) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, "image/svg+xml");
+        const svg = doc.querySelector('svg');
+        if (!svg) {
+            alert('No SVG element found.');
+            return;
+        }
+
+        // Determine natural size from viewBox if available,
+        // otherwise use width/height attributes (or defaults)
+        vBox = svg.getAttribute('viewBox');
+        if (vBox) {
+            const parts = vBox.split(/[\s,]+/);
+            if (parts.length === 4) {
+                naturalWidth = parseFloat(parts[2]);
+                naturalHeight = parseFloat(parts[3]);
+                viewBox = [parseFloat(parts[0]), parseFloat(parts[1]), 
+                           naturalWidth, naturalHeight]
+            }
+        } else {
+            naturalWidth = parseFloat(svg.getAttribute('width')) || 300;
+            naturalHeight = parseFloat(svg.getAttribute('height')) || 150;
+            viewBox = [0,0,naturalWidth,naturalHeight]
+        }
+
+        // Create a wrapper div sized to the SVG’s natural dimensions.
+        svgWrapper = document.createElement('div');
+        svgWrapper.id = "svgWrapper";
+        svgWrapper.style.width = naturalWidth + "px";
+        svgWrapper.style.height = naturalHeight + "px";
+
+        // Insert the SVG (its intrinsic attributes remain untouched)
+        svgWrapper.appendChild(svg);
+        dropZone.innerHTML = "";
+        dropZone.appendChild(svgWrapper);
+
+        // Delay processing so that SVG is rendered (getBBox works properly)
+        requestAnimationFrame(() => {
+            // Preprocess: e.g., add a 45° rotation.
+            preProcess(svg);
+            console.log("After preProcess:", svg.outerHTML);
+            // Recompute natural size using getBBox (of the inner <g> if available)
+            const target = svg.querySelector('g') || svg;
+            const bbox = target.getBBox();
+            naturalWidth = bbox.width;
+            naturalHeight = bbox.height;
+            svgWrapper.style.width = naturalWidth + "px";
+            svgWrapper.style.height = naturalHeight + "px";
+            updateScale();
+            
+            loadingFinished()
+            
+        });
+    }
+
+    function preProcess(svgElement) {
+        window.flatten(svgElement, true, true);
+        return subdivideCurvesInSvg(svgElement, OCTAVES);
+    }
+
+    // updateScale: scale the svgWrapper so it fits in dropZone.
+    function updateScale() {
+        if (!svgWrapper) return;
+        const containerWidth = dropZone.clientWidth;
+        const containerHeight = dropZone.clientHeight;
+        const scaleFactor = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+        svgWrapper.style.transform = "scale(" + scaleFactor + ")";
+    }
+
+    window.addEventListener('resize', updateScale);
+
+    // getSvgElement: return a deep copy of the current SVG element.
+    function getSvgElement() {
+        return svgWrapper.querySelector('svg').cloneNode(true);
+    }
+
+    // updateSvgElement: replace the existing SVG with a modified one and update layout.
+    function updateSvgElement(newSvg) {
+        const oldSvg = svgWrapper.querySelector('svg');
+        if (oldSvg) {
+            svgWrapper.replaceChild(newSvg, oldSvg);
+        } else {
+            svgWrapper.appendChild(newSvg);
+        }
+        requestAnimationFrame(() => {
+            const target = newSvg.querySelector('g') || newSvg;
+            const bbox = target.getBBox();
+            naturalWidth = bbox.width;
+            naturalHeight = bbox.height;
+            svgWrapper.style.width = naturalWidth + "px";
+            svgWrapper.style.height = naturalHeight + "px";
+            updateScale();
+        });
+    }
+
+    document.querySelectorAll('.toggle-button').forEach(button => {
+        const input = button.querySelector('input');
+        if (input && input.checked) button.classList.add('pressed');
+        
+        if (input) {
+            input.addEventListener('change', () => {
+                button.classList.toggle('pressed', input.checked);
+            });
+        }
+    });
+    // Add file input handler
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file && (file.type === 'image/svg+xml' || file.name.endsWith('.svg'))) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                loadSVG(event.target.result);
+            };
+            reader.readAsText(file);
+        } else if (file) {
+            alert('Please select a valid SVG file.');
+        }
+    });
+</script>
+
+
+<!-- ALL THE STUFF NOT RELADING TO SVG LOADING AND DISPLAY -->
+<script>
+    const OCTAVES = 7
+    // --- Seeded RNG Implementation (LCG) ---
+    const m = 4294967296; // 2^32
+    const a = 1664525;
+    const c = 1013904223;
+    let prngState = 0;    // internal state, updated on every call
+
+    function setSeed(s) {
+        params.initialSeed = s >>> 0;
+        prngState = params.initialSeed;
+    }
+
+    function seededRandom() {
+        prngState = (a * prngState + c) % m;
+        return prngState / m;
+    }
+
+    // [recent] Parameters class encapsulates all distortion parameters and their derivation
+    class Parameters {
+        constructor() {
+            this.initialSeed = 0;
+            this.preservePerimeter = true;
+            this.baseRes = 0;      // set after SVG load
+            // never look at this directly; the math in encapsulating method getOctaveAmplitude(n) is essential
+            this.octaveAmplitudes = null;  // Will be set when equalizer is built
+        }
+
+        setBaseRes(res) {
+            this.baseRes = res;
+        }
+
+        getNumOctaves() {
+            return OCTAVES;
+        }
+
+        getOctaveAmplitude(octaveIndex) {
+            if (this.octaveAmplitudes) {
+                const gridRes = this.baseRes / Math.pow(2, octaveIndex);
+                // Convert slider value [0,1] to amplitude using log scale from 2^minPow to 2^maxPow
+                const sliderVal = this.octaveAmplitudes[octaveIndex];
+                const minPow = -2;
+                const maxPow = 5;
+                if (sliderVal===0) return 0;
+                const logScale = minPow + sliderVal * (maxPow - minPow);
+                const amplitude = Math.pow(2, logScale)/100;
+                return amplitude * gridRes;
+            }
+            return 0;
+        }
+
+        getGridResolution(octaveIndex) {
+            return this.baseRes / Math.pow(2, octaveIndex);
+        }
+
+        getEffectiveBaseRes() {
+            return this.baseRes.toFixed(3);
+        }
+    }
+
+    let params = new Parameters();
+    let currentTask = null;
+    let originalSVG = "";
+    let distortedSVG = "";
+    let defaultBaseRes = 0;
+
+    // Keep only the UI elements we're still using
+    const seedDisplay = document.getElementById("seedDisplay");
+    const randomizeSeedButton = document.getElementById("randomizeSeed");
+    const preservePerimeterCheckbox = document.getElementById("preservePerimeter");
+    const baseResDisplay = document.getElementById("baseResDisplay");
+    const octavesDisplay = document.getElementById("octavesDisplay");
+    const downloadButton = document.getElementById("downloadButton");
+
+    // --- Seed UI ---
+    function updateSeedDisplay() {
+        seedDisplay.textContent = params.initialSeed;
+    }
+
+    randomizeSeedButton.addEventListener("click", () => {
+        // Pick a new seed randomly
+        const newSeed = Math.floor(Math.random() * m);
+        setSeed(newSeed);
+        updateSeedDisplay();
+        startDistortion();
+    });
+    
+    function loadingFinished() {
+        // Save original SVG for warping
+        originalSVG = getSvgElement().outerHTML;
+        document.querySelector('.top').classList.remove('controls-disabled');
+        
+        // Clear any existing equalizer
+        const eqContainer = document.getElementById('equalizer');
+        if (eqContainer) {
+            eqContainer.innerHTML = '';
+        }
+        
+        setDefaults();
+        startDistortion();
+    }
+
+    // Initialize controls as disabled
+    document.addEventListener('DOMContentLoaded', () => {});
+
+    // --- Default Settings ---
+    function setDefaults() {
+        setSeed(Math.floor(Math.random() * m));
+        updateSeedDisplay();
+
+        params = new Parameters();
+        params.setBaseRes(Math.max(viewBox[2], viewBox[3]));
+        defaultBaseRes = params.baseRes;
+
+        initializeEqualizer();
+        // document.getElementById("octavesDisplay").textContent = "10";
+        preservePerimeterCheckbox.checked = params.preservePerimeter;
+
+        updateComputedParams();
+    }
+
+    preservePerimeterCheckbox.addEventListener("input", () => {
+        params.preservePerimeter = preservePerimeterCheckbox.checked;
+        startDistortion();
+    });
+
+    downloadButton.addEventListener("click", () => {
+        const blob = new Blob([distortedSVG], {type: "image/svg+xml"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "distorted.svg";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    function createWarpFunction(minX, minY, maxX, maxY, preservePerim) {
+        // Size needs to be 2^n + 1 to work with diamond-square
+        const gridSize = Math.pow(2, params.getNumOctaves()) + 1;
+        
+        // Create two grids for x and y displacement
+        const gridX = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+        const gridY = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+
+        // Initialize corners to 0 if preserving perimeter
+        if (preservePerim) {
+            // All edges will remain 0
+        } else {
+            // Only initialize corners with random values if not preserving perimeter
+            const s = gridSize - 1;
+            gridX[0][0] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            gridX[0][s] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            gridX[s][0] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            gridX[s][s] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            
+            gridY[0][0] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            gridY[0][s] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            gridY[s][0] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+            gridY[s][s] = (seededRandom() - 0.5) * 2 * params.getOctaveAmplitude(0);
+        }
+
+        // Diamond-square algorithm implementation
+        for (let level = 0; level < params.getNumOctaves(); level++) {
+            const step = Math.pow(2, params.getNumOctaves() - level - 1);
+            const amplitude1 = params.getOctaveAmplitude(level);
+            const amplitude2 = params.getOctaveAmplitude(Math.min(level,params.getNumOctaves()-1));
+            const amplitude1_5 = (amplitude1+amplitude2)/2;
+            
+            // Diamond step
+            for (let x = step; x < gridSize - 1; x += step * 2) {
+                for (let y = step; y < gridSize - 1; y += step * 2) {
+                    if (!preservePerim || (x > step && x < gridSize-1-step && y > step && y < gridSize-1-step)) {
+                        // Average of corners
+                        const avgX = (gridX[x-step][y-step] + gridX[x-step][y+step] + 
+                                    gridX[x+step][y-step] + gridX[x+step][y+step]) / 4;
+                        const avgY = (gridY[x-step][y-step] + gridY[x-step][y+step] + 
+                                    gridY[x+step][y-step] + gridY[x+step][y+step]) / 4;
+                        
+                        gridX[x][y] = avgX + (seededRandom() - 0.5) * 2 * amplitude1;
+                        gridY[x][y] = avgY + (seededRandom() - 0.5) * 2 * amplitude1;
+                    }
+                }
+            }
+
+            // Square step
+            for (let x = 0; x < gridSize; x += step) {
+                for (let y = (x + step) % (step * 2); y < gridSize; y += step * 2) {
+                    if (!preservePerim || (x > 0 && x < gridSize-1 && y > 0 && y < gridSize-1)) {
+                        let countX = 0, sumX = 0, countY = 0, sumY = 0;
+                        
+                        // Collect valid neighbors
+                        if (x >= step) { 
+                            sumX += gridX[x-step][y]; countX++;
+                            sumY += gridY[x-step][y]; countY++;
+                        }
+                        if (x + step < gridSize) {
+                            sumX += gridX[x+step][y]; countX++;
+                            sumY += gridY[x+step][y]; countY++;
+                        }
+                        if (y >= step) {
+                            sumX += gridX[x][y-step]; countX++;
+                            sumY += gridY[x][y-step]; countY++;
+                        }
+                        if (y + step < gridSize) {
+                            sumX += gridX[x][y+step]; countX++;
+                            sumY += gridY[x][y+step]; countY++;
+                        }
+
+                        gridX[x][y] = (sumX / countX) + (seededRandom() - 0.5) * 2 * amplitude1_5;
+                        gridY[x][y] = (sumY / countY) + (seededRandom() - 0.5) * 2 * amplitude1_5;
+                    }
+                }
+            }
+        }
+
+// Cubic interpolation for a single dimension
+        function cubicInterpolate(v0, v1, v2, v3, t) {
+            const a0 = -0.5 * v0 + 1.5 * v1 - 1.5 * v2 + 0.5 * v3;
+            const a1 = v0 - 2.5 * v1 + 2 * v2 - 0.5 * v3;
+            const a2 = -0.5 * v0 + 0.5 * v2;
+            const a3 = v1;
+            return a0 * t * t * t + a1 * t * t + a2 * t + a3;
+        }
+
+// Bicubic interpolation for 2D grid
+        function bicubicInterpolate(grid, x, y, fx, fy) {
+            // Get a 4x4 neighborhood around the point
+            const points = Array(4).fill().map(() => Array(4));
+
+            for (let i = 0; i < 4; i++) {
+                const xPos = Math.min(Math.max(x - 1 + i, 0), grid.length - 1);
+                for (let j = 0; j < 4; j++) {
+                    const yPos = Math.min(Math.max(y - 1 + j, 0), grid[0].length - 1);
+                    points[i][j] = grid[xPos][yPos];
+                }
+            }
+
+            // Interpolate in y direction first
+            const temp = Array(4);
+            for (let i = 0; i < 4; i++) {
+                temp[i] = cubicInterpolate(points[i][0], points[i][1], points[i][2], points[i][3], fy);
+            }
+
+            // Then interpolate in x direction
+            return cubicInterpolate(temp[0], temp[1], temp[2], temp[3], fx);
+        }
+
+// Update the warp function to use bicubic interpolation
+        return function warp(x, y) {
+            // Convert x,y to grid coordinates
+            const gx = (x - minX) / (maxX - minX) * (gridSize - 1);
+            const gy = (y - minY) / (maxY - minY) * (gridSize - 1);
+
+            // Get grid cell coordinates
+            const ix = Math.floor(gx);
+            const iy = Math.floor(gy);
+
+            // Get interpolation parameters
+            const fx = gx - ix;
+            const fy = gy - iy;
+
+            return {
+                x: x + bicubicInterpolate(gridX, ix, iy, fx, fy),
+                y: y + bicubicInterpolate(gridY, ix, iy, fx, fy)
+            };
+        }
+    }
+
+    // --- Background Distortion Task ---
+    function startDistortion() {
+        if (currentTask) {
+            currentTask.cancelled = true;
+            currentTask = null;
+        }
+        if (!originalSVG) return;
+
+        prngState = params.initialSeed;
+
+        // Use viewBox dimensions instead of undefined globals
+        let minX = viewBox[0], minY = viewBox[1];
+        let maxX = viewBox[0] + viewBox[2];
+        let maxY = viewBox[1] + viewBox[3];
+
+        const warp = createWarpFunction(minX, minY, maxX, maxY, params.preservePerimeter);
+
+        const dRegex = /(d=")([^"]+)(")/g;
+        let matches = [];
+        let m;
+        while ((m = dRegex.exec(originalSVG)) !== null) {
+            matches.push({start: m.index, end: dRegex.lastIndex, content: m[2]});
+        }
+
+        const results = new Array(matches.length);
+        let index = 0;
+        const task = {cancelled: false};
+        currentTask = task;
+
+        function processChunk() {
+            if (task.cancelled) return;
+            const chunkStart = performance.now();
+            while (index < matches.length && (performance.now() - chunkStart) < 5) {
+                const {content} = matches[index];
+                const newContent = content.replace(/([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)[,\s]+([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)/g, (match, xStr, yStr) => {
+                    const x = parseFloat(xStr), y = parseFloat(yStr);
+                    const warped = warp(x, y);
+                    return warped.x.toFixed(3) + "," + warped.y.toFixed(3);
+                });
+                results[index] = newContent;
+                index++;
+            }
+            if (index < matches.length) {
+                setTimeout(processChunk, 2);
+            } else {
+                let offset = 0;
+                let newSVG = originalSVG;
+                matches.forEach((matchObj, i) => {
+                    const before = newSVG.slice(0, matchObj.start + offset);
+                    const after = newSVG.slice(matchObj.end + offset);
+                    const replacement = 'd="' + results[i] + '"';
+                    newSVG = before + replacement + after;
+                    offset += replacement.length - (matchObj.end - matchObj.start);
+                });
+                distortedSVG = newSVG;
+                
+                // Parse the SVG string into a DOM element
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(distortedSVG, "image/svg+xml");
+                const svgElement = doc.documentElement;
+                
+                updateSvgElement(svgElement);
+                downloadButton.style.display = "inline-block";
+                currentTask = null;
+            }
+        }
+
+        processChunk();
+    }
+
+    function updateAmpLabels() {
+        ampLargeLabel.textContent = ampLargeSlider.value + "%";
+        ampSmallLabel.textContent = ampSmallSlider.value + "%";
+        startDistortion();
+    }
+
+    function initializeEqualizer() {
+        const eq = new HandyEqualizer('#equalizer', params.getNumOctaves(), (positions) => {
+            params.octaveAmplitudes = positions;
+            startDistortion();
+        });
+        params.octaveAmplitudes = eq.getEQ();
+    }
+
+    function updateComputedParams() {
+        // baseResDisplay.textContent = params.getEffectiveBaseRes();
+        // octavesDisplay.textContent = params.getNumOctaves();
+        startDistortion();
+    }
+
+    // placeholder
+    new HandyEqualizer('#equalizer', 5, (positions) => { });
+</script>
+
+
+
+
+<!-- Begin Path Subdivision Utility Block -->
+<script>
+    // Sample a cubic at a parameter t using de Casteljau (linear interpolation)
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+    
+    function pointLerp(p, q, t) {
+        return { x: lerp(p.x, q.x, t), y: lerp(p.y, q.y, t) };
+    }
+    
+    // Approximate cubic length by sampling at t = 0, 0.25, 0.5, 0.75, 1
+    function approximateCubicLength(x0, y0, x1, y1, x2, y2, x3, y3) {
+        const sampleTs = [0, 0.25, 0.5, 0.75, 1];
+        let prev = {x: x0, y: y0};
+        let length = 0;
+        for (let t of sampleTs.slice(1)) {
+            // Compute point at t:
+            const ab = { x: lerp(x0, x1, t), y: lerp(y0, y1, t) };
+            const bc = { x: lerp(x1, x2, t), y: lerp(y1, y2, t) };
+            const cd = { x: lerp(x2, x3, t), y: lerp(y2, y3, t) };
+            const abbc = { x: lerp(ab.x, bc.x, t), y: lerp(ab.y, bc.y, t) };
+            const bccd = { x: lerp(bc.x, cd.x, t), y: lerp(bc.y, cd.y, t) };
+            const p = { x: lerp(abbc.x, bccd.x, t), y: lerp(abbc.y, bccd.y, t) };
+            length += Math.hypot(p.x - prev.x, p.y - prev.y);
+            prev = p;
+        }
+        return length;
+    }
+    
+    // Subdivide a cubic Bezier (De Casteljau). Returns an array [firstCubic, secondCubic]
+    function subdivideCubic(x0, y0, x1, y1, x2, y2, x3, y3) {
+        // Compute midpoints of segments
+        const ab = {x: lerp(x0, x1, 0.5), y: lerp(y0, y1, 0.5)};
+        const bc = {x: lerp(x1, x2, 0.5), y: lerp(y1, y2, 0.5)};
+        const cd = {x: lerp(x2, x3, 0.5), y: lerp(y2, y3, 0.5)};
+        const abbc = {x: lerp(ab.x, bc.x, 0.5), y: lerp(ab.y, bc.y, 0.5)};
+        const bccd = {x: lerp(bc.x, cd.x, 0.5), y: lerp(bc.y, cd.y, 0.5)};
+        const mid = {x: lerp(abbc.x, bccd.x, 0.5), y: lerp(abbc.y, bccd.y, 0.5)};
+        
+        return [
+            {
+                type: 'cubic',
+                start: {x: x0, y: y0},
+                control1: ab,
+                control2: abbc,
+                end: mid
+            },
+            {
+                type: 'cubic',
+                start: mid,
+                control1: bccd,
+                control2: cd,
+                end: {x: x3, y: y3}
+            }
+        ];
+    }
+    
+    function parsePaths(d) {
+        let pathSegments = d.split(/(?=[MmLlHhVvCcSsQqTtAaZzn])/);
+        let pieces = [];
+        let gather = (p) => { if (p) pieces.push(p); }
+        // cursor
+        let c = {x: 0, y: 0};
+        let subpathStart = {x: 0, y: 0};
+        let prevControl = null;
+        for (let i = 0; i < pathSegments.length; i++) {
+            let segment = pathSegments[i];
+            let command = segment[0];
+            let args = segment.substring(1).trim().split(/[\s,]+/);
+            switch (command) {
+                case 'n':  // none
+                    break;
+                case 'M':
+                    // Move first, then update subpathStart
+                    c.x = parseFloat(args.shift());
+                    c.y = parseFloat(args.shift());
+                    subpathStart = {x: c.x, y: c.y};  // Fixed: Set after moving
+                    while (args.length >= 2) {
+                        let x2 = parseFloat(args.shift());
+                        let y2 = parseFloat(args.shift());
+                        gather({
+                            type: 'segment',
+                            start: {x: c.x, y: c.y},
+                            end: {x: c.x = x2, y: c.y = y2}
+                        });
+                    }
+                    prevControl = null;
+                    break;
+                case 'm':
+                    // Move first, then update subpathStart
+                    c.x += parseFloat(args[0]);
+                    c.y += parseFloat(args[1]);
+                    subpathStart = {x: c.x, y: c.y};  // Fixed: Set after moving
+                    while (args.length >= 2) {
+                        let x2 = parseFloat(args.shift());
+                        let y2 = parseFloat(args.shift());
+                        gather({
+                            type: 'segment',
+                            start: {x: c.x, y: c.y},
+                            end: {x: c.x += x2, y: c.y += y2}
+                        });
+                    }
+                    prevControl = null;
+                    break;
+                case 'Z':
+                case 'z':
+                {
+                    let x2 = subpathStart.x;
+                    let y2 = subpathStart.y;
+                    gather({
+                        type: 'segment',
+                        start: {x: c.x, y: c.y},
+                        end: {x: x2, y: y2}
+                    });
+                    c.x = x2;  // Move cursor back to start
+                    c.y = y2;
+                    // Fixed: Don't update subpathStart here
+                }
+                    prevControl = null;
+                    break;
+                case 'L':
+                    while (args.length >= 2) {
+                        let x2 = parseFloat(args.shift());
+                        let y2 = parseFloat(args.shift());
+                        gather({
+                            type: 'segment',
+                            start: {x: c.x, y: c.y},
+                            end: {x: x2, y: y2}
+                        });
+                    }
+                    prevControl = null;
+                    break;
+                case 'l':
+                    while (args.length >= 2) {
+                        let x2 = parseFloat(args.shift());
+                        let y2 = parseFloat(args.shift());
+                        gather({
+                            type: 'segment',
+                            start: {x: c.x, y: c.y},
+                            end: {x: c.x += x2, y: c.y += y2}
+                        });
+                    }
+                    prevControl = null;
+                    break;
+                case 'H':
+                    while (args.length) gather({
+                        type: 'segment',
+                        start: {x: c.x, y: c.y},
+                        end: {x: parseFloat(args.shift()), y: c.y}
+                    });
+                    prevControl = null;
+                    break;
+                case 'h':
+                    while (args.length) gather({
+                        type: 'segment',
+                        start: {x: c.x, y: c.y},
+                        end: {x: c.x += parseFloat(args.shift()), y: c.y}
+                    });
+                    prevControl = null;
+                    break;
+                case 'V':
+                    while (args.length) gather({
+                        type: 'segment',
+                        start: {x: c.x, y: c.y},
+                        end: {x: c.x, y: parseFloat(args.shift())}
+                    });
+                    prevControl = null;
+                    break;
+                case 'v':
+                    while (args.length) gather({
+                        type: 'segment',
+                        start: {x: c.x, y: c.y},
+                        end: {x: c.x, y: c.y += parseFloat(args.shift())}
+                    });
+                    prevControl = null;
+                    break;
+                case 'C':
+                    while (args.length >= 6) {
+                        let c1 = {x: parseFloat(args.shift()), y: parseFloat(args.shift())};
+                        let c2 = {x: parseFloat(args.shift()), y: parseFloat(args.shift())};
+                        let p2 = {x: parseFloat(args.shift()), y: parseFloat(args.shift())};
+                        gather({
+                            type: 'cubic',
+                            start: {x: c.x, y: c.y},
+                            control1: c1,
+                            control2: c2,
+                            end: p2
+                        });
+                        prevControl = c2;
+                        c = {x: p2.x, y: p2.y};
+                    }
+                    break;
+                case 'c':
+                    while (args.length >= 6) {
+                        let c1 = {x: c.x + parseFloat(args.shift()), y: c.y + parseFloat(args.shift())};
+                        let c2 = {x: c.x + parseFloat(args.shift()), y: c.y + parseFloat(args.shift())};
+                        let p2 = {x: c.x + parseFloat(args.shift()), y: c.y + parseFloat(args.shift())};
+                        gather({
+                            type: 'cubic',
+                            start: {x: c.x, y: c.y},
+                            control1: c1,
+                            control2: c2,
+                            end: p2
+                        });
+                        prevControl = c2;
+                        c = {x: p2.x, y: p2.y};
+                    }
+                    break;
+                case 'S':
+                    while (args.length >= 4) {
+                        // Fixed: Reflect previous control point through current point
+                        let c1;
+                        if (prevControl) {
+                            c1 = {
+                                x: 2 * c.x - prevControl.x,
+                                y: 2 * c.y - prevControl.y
+                            };
+                        } else {
+                            c1 = {x: c.x, y: c.y};
+                        }
+                        let c2 = {x: parseFloat(args.shift()), y: parseFloat(args.shift())};
+                        let p2 = {x: parseFloat(args.shift()), y: parseFloat(args.shift())};
+                        gather({
+                            type: 'cubic',
+                            start: {x: c.x, y: c.y},
+                            control1: c1,
+                            control2: c2,
+                            end: p2
+                        });
+                        prevControl = c2;
+                        c = {x: p2.x, y: p2.y};
+                    }
+                    break;
+                case 's':
+                    while (args.length >= 4) {
+                        // Fixed: Reflect previous control point through current point
+                        let c1;
+                        if (prevControl) {
+                            c1 = {
+                                x: 2 * c.x - prevControl.x,
+                                y: 2 * c.y - prevControl.y
+                            };
+                        } else {
+                            c1 = {x: c.x, y: c.y};
+                        }
+                        let c2 = {x: c.x + parseFloat(args.shift()), y: c.y + parseFloat(args.shift())};
+                        let p2 = {x: c.x + parseFloat(args.shift()), y: c.y + parseFloat(args.shift())};
+                        gather({
+                            type: 'cubic',
+                            start: {x: c.x, y: c.y},
+                            control1: c1,
+                            control2: c2,
+                            end: p2
+                        });
+                        prevControl = c2;
+                        c = {x: p2.x, y: p2.y};
+                    }
+                    break;
+                // note, i think the flatten library already converts
+                // these to cubics
+                case 'a':
+                case 'A':
+                case 'Q':
+                case 'q':
+                case 'T':
+                case 't':
+                    throw new Error("Path elements a,q,t not supported");
+            }
+        }
+        return pieces;
+    }
+    
+    function pathToString(path) {
+        if (path.type === 'segment') {
+            return `L ${path.end.x} ${path.end.y}`;
+        } else if (path.type === 'cubic') {
+            return `C ${path.control1.x} ${path.control1.y} ${path.control2.x} ${path.control2.y} ${path.end.x} ${path.end.y}`;
+        }
+    }
+    
+    function subdividePath(path, threshold) {
+        if (path.type === 'segment') {
+            const length = Math.hypot(path.end.x - path.start.x, path.end.y - path.start.y);
+            if (length <= threshold) return [path];
+            const points = Array.from({length: Math.ceil(length / threshold) + 1}, (_, i) => ({
+                x: path.start.x + (path.end.x - path.start.x) * (i / Math.ceil(length / threshold)),
+                y: path.start.y + (path.end.y - path.start.y) * (i / Math.ceil(length / threshold))
+            }));
+            return points.slice(1).map((p, i) => ({type: 'segment', start: points[i], end: p}));
+
+        } else if (path.type === 'cubic') {
+            const len = approximateCubicLength(
+                path.start.x, path.start.y,
+                path.control1.x, path.control1.y,
+                path.control2.x, path.control2.y,
+                path.end.x, path.end.y
+            );
+            if (len <= threshold) {
+                return [path];
+            } else {
+                const [first, second] = subdivideCubic(
+                    path.start.x, path.start.y,
+                    path.control1.x, path.control1.y,
+                    path.control2.x, path.control2.y,
+                    path.end.x, path.end.y
+                );
+                return [
+                    ...subdividePath(first, threshold),
+                    ...subdividePath(second, threshold)
+                ];
+            }
+        }
+    }
+    
+    function subdivideCurvesInSvg(svgElement, numOctaves) {
+        try {
+            // Find all path elements in the SVG
+            const pathElements = svgElement.querySelectorAll('path');
+
+            // note, 'params' hasn't been computed yet, but naturalWidth, naturalHeight have        
+            const threshold = Math.max(naturalWidth, naturalHeight) * Math.pow(2, 1 - numOctaves);
+            
+            pathElements.forEach(pathElement => {
+                const dContent = pathElement.getAttribute('d');
+                if (!dContent) return;
+                
+                // Parse the path into segments
+                const paths = parsePaths(dContent);
+                if (paths.length === 0) return;
+                
+                // Subdivide each path segment if needed
+                let result = `M ${paths[0].start.x} ${paths[0].start.y}`;
+                for (let path of paths) {
+                    const subdivided = subdividePath(path, threshold);
+                    for (let subpath of subdivided) {
+                        result += ' ' + pathToString(subpath);
+                    }
+                }
+                
+                // Update the path element directly
+                pathElement.setAttribute('d', result);
+            });
+            
+            return svgElement;
+        } catch (ex) {
+            console.error("Subdivision error:", ex);
+            return svgElement;
+        }
+    }
+    
+    // Then, modify setSeed to call subdivideCurvesInSvg:
+    function setSeed(s) {
+        params.initialSeed = s >>> 0;
+        prngState = params.initialSeed;
+    }
+</script>
+<!-- End Path Subdivision Utility Block -->
+</body>
+</html>
