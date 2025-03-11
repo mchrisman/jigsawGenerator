@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Glowforge Swatch Maker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .swatch-controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #3367d6;
+        }
+
+        .swatch-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .swatch-editor {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            width: 300px;
+        }
+
+        .swatch-editor h3 {
+            margin-top: 0;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .swatch-editor select {
+            margin-bottom: 10px;
+        }
+
+        .swatch-editor textarea {
+            width: 100%;
+            height: 80px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+
+        .swatch-editor .character-count {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .swatch-editor .error {
+            color: red;
+            font-size: 14px;
+        }
+
+        .swatch-preview {
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin: 5px;
+            display: inline-block;
+        }
+
+        #preview-svg {
+            margin-top: 20px;
+        }
+
+        #preview-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<h1>Glowforge Swatch Maker</h1>
+<p>
+<ol>
+
+    <li>
+        Add one or more swatches.
+    <li>Type your labels.
+    <li> Generate your Glowforge-ready SVG.
+    <li> Engrave the circle, score the text, and cut the outline.
+    <li>Remove the masking from the bottom section, leave it on the top section, and apply your finish.</li>
+</ol>
+</p>
+
+<div class="swatch-controls">
+    <button id="add-swatch-btn">Add Swatch</button>
+    <button id="generate-svg-btn">Generate & Download SVG</button>
+</div>
+
+<div id="swatch-list" class="swatch-list">
+    <p id="empty-message">Add your first swatch to get started.</p>
+</div>
+
+<div id="preview-container"></div>
+
+<!-- Font data (relief-font-data.js) – include your full data here -->
+<script src="relief-font-data.js"></script>
+<script>
+    function getGlyphData(char) {
+        for (const key in fontData.glyphs) {
+            if (fontData.glyphs[key].character === char) { return fontData.glyphs[key]; }
+        }
+        return null;
+    }
+
+    function getPathData(char) {
+        const glyph = getGlyphData(char);
+        return glyph ? glyph.pathData : "";
+    }
+</script>
+
+<!-- Simplified single-line font renderer -->
+<script>
+    const MAX_LINES = 7;
+
+    function renderSingleLineText(text, options = {}) {
+        const defaults = {width: 124.8, height: 90, color: '#400', strokeWidth: 0.32};
+        const config = Object.assign({}, defaults, options);
+        const lines = text.trim().split('\n').slice(0, MAX_LINES);
+        const capHeight = fontData.metadata.capHeight;
+        const leading = capHeight * 0.5;
+        const naturalLineWidths = lines.map(line => {
+            let width = 0;
+            for (const ch of line) {
+                const glyph = getGlyphData(ch);
+                width += glyph ? glyph.horizAdvX : fontData.metadata.defaultHorizAdvX;
+            }
+            return width;
+        });
+        const naturalMaxWidth = Math.max(...naturalLineWidths, 1);
+        const naturalTotalHeight = capHeight + (lines.length - 1) * (capHeight + leading);
+        // Use a scale factor (min with .1 to avoid oversizing)
+        const scale = Math.min(.1, Math.min(config.width / naturalMaxWidth, config.height / naturalTotalHeight));
+        const TEXT_BOTTOM = 177;
+        const parentGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        parentGroup.setAttribute('transform', `translate(0, ${TEXT_BOTTOM - naturalTotalHeight * scale}) scale(${scale})`);
+
+        lines.forEach((line, i) => {
+            const lineGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            const baseline = capHeight + i * (capHeight + leading);
+            lineGroup.setAttribute('transform', `translate(0, ${baseline})`);
+            let xPos = 0;
+            for (const ch of line) {
+                const glyph = getGlyphData(ch);
+                const horizAdvX = glyph ? glyph.horizAdvX : fontData.metadata.defaultHorizAdvX;
+                const pathData = glyph ? glyph.pathData : "";
+                if (pathData && pathData.length > 0) {
+                    const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    pathEl.setAttribute('d', pathData);
+                    pathEl.setAttribute('transform', `translate(${xPos}, 0) scale(1,-1)`);
+                    pathEl.setAttribute('fill', 'none');
+                    pathEl.setAttribute('stroke', config.color);
+                    pathEl.setAttribute('stroke-width', config.strokeWidth / scale); // Affinity Designer doesn't support non-scaling-stroke
+                    // pathEl.setAttribute('vector-effect', 'non-scaling-stroke');
+                    pathEl.setAttribute('stroke-linecap', 'round');
+                    pathEl.setAttribute('stroke-linejoin', 'round');
+                    lineGroup.appendChild(pathEl);
+                }
+                xPos += horizAdvX;
+            }
+            parentGroup.appendChild(lineGroup);
+        });
+        return parentGroup;
+    }
+</script>
+
+<!-- Global preset lists -->
+<script>
+    const presets = {
+        "Oil Finishes": [
+            "Pure Tung Oil",
+            "Boiled Linseed\nOil",
+            "Danish Oil",
+            "Teak Oil",
+            "Walnut Oil",
+            "Mineral Oil",
+            "Tung Oil +\nBeeswax",
+            "Antique Oil\nFinish",
+            "Watco Danish\nOil",
+            "Linseed Oil +\nMineral\nSpirits",
+            "Pure Tung Oil +\nCitrus Solvent",
+            "Hemp Oil",
+            "Camellia Oil",
+            "Odie's Oil",
+            "Tried & True\nOriginal",
+            "Osmo Polyx-Oil",
+            "Rubio Monocoat",
+            "Olive Oil",
+            "Mahoney's\nWalnut Oil",
+            "Sutherland\nWelles Tung Oil"
+        ],
+        "Varnishes and Polyurethanes": [
+            "Oil-Based Poly\nGloss",
+            "Oil-Based Poly\nSatin",
+            "Oil-Based Poly\nMatte",
+            "Water-Based\nPoly Gloss",
+            "Water-Based\nPoly Satin",
+            "Water-Based\nPoly Matte",
+            "Spar Varnish",
+            "Marine Varnish",
+            "Alkyd Varnish",
+            "Wiping Varnish",
+            "Spar Urethane",
+            "Gel Varnish",
+            "Acrylic Varnish",
+            "Conversion\nVarnish",
+            "Danish Oil +\nPoly Topcoat"
+        ],
+        "Lacquers": [
+            "Nitrocellulose\nLacquer",
+            "Acrylic Lacquer",
+            "CAB-Acrylic\nLacquer",
+            "Pre-Catalyzed\nLacquer",
+            "Post-Catalyzed\nLacquer",
+            "Water-Based\nLacquer",
+            "Brushing\nLacquer",
+            "Spray Lacquer",
+            "Lacquer +\nLacquer Wax",
+            "French Polish\n(Shellac)"
+        ],
+        "Shellac Finishes": [
+            "Clear Shellac",
+            "Amber Shellac",
+            "Garnet Shellac",
+            "Button Lac\nShellac",
+            "Blonde Shellac",
+            "Dewaxed\nShellac",
+            "Shellac +\nWax Topcoat",
+            "Zinsser\nSealCoat +\nPoly",
+            "Shellac +\nDanish Oil",
+            "Shellac +\nLacquer"
+        ],
+        "Water-Based Finishes": [
+            "General\nFinishes\nEnduro-Var",
+            "GF High\nPerformance",
+            "Target Coatings\nEM6000",
+            "Crystalac\nSuper Premium",
+            "Hydrocote\nResistant",
+            "Bona Traffic HD",
+            "Water-Based\nWiping Stain +\nWater Poly",
+            "Water-Based\nDye + Poly",
+            "Minwax\nPolycrylic",
+            "Emtech EM8000"
+        ],
+        "Stain-Based Finishes": [
+            "Oil Stain +\nPoly",
+            "Gel Stain +\nWipe-On Poly",
+            "Water-Based\nStain + Poly",
+            "Pre-Stain +\nOil Stain +\nPoly",
+            "Dye Stain +\nGel Topcoat",
+            "Traditional\nPenetrating\nStain + Varnish",
+            "Minwax Stain +\nPoly All-In-One",
+            "Dye + Shellac\nWash + Poly",
+            "Japan Colors +\nGlaze + Varnish",
+            "Aniline Dye +\nOil Varnish"
+        ],
+        "Wax Finishes": [
+            "Pure Beeswax",
+            "Carnauba Wax",
+            "Paste Wax",
+            "Briwax",
+            "Renaissance\nWax",
+            "Feed-N-Wax",
+            "Butcher's Wax",
+            "Minwax Paste\nFinishing Wax",
+            "Shellac +\nWax Finish",
+            "Howard Citrus\nShield Paste\nWax"
+        ],
+        "Specialty Finishes": [
+            "Milk Paint +\nWax",
+            "Milk Paint +\nPoly Topcoat",
+            "Chalk Paint +\nWax",
+            "Chalk Paint +\nPoly",
+            "Ceruse Finish\n(Liming Wax)",
+            "Chinese Wood\nOil",
+            "Waterlox\nOriginal",
+            "Black Japan",
+            "Ebonizing +\nShellac",
+            "Liberon Oil\nFinish",
+            "Min-Wax\nOne-Step",
+            "Fuming + Oil\nFinish",
+            "Scorching +\nOil",
+            "Pine Tar Oil\nFinish",
+            "Scandinavian\nSoap Finish"
+        ],
+        "Stains": [
+            "Antique Mahogany",
+            "Ash Gray",
+            "Black Ebony",
+            "Cabernet",
+            "Cedar",
+            "Cherry",
+            "Chestnut",
+            "Classic Gray",
+            "Dark Walnut",
+            "Driftwood",
+            "Early American",
+            "Ebony",
+            "English Oak",
+            "Espresso",
+            "Golden Oak",
+            "Golden Pecan",
+            "Gunstock",
+            "Honey Maple",
+            "Ipswich Pine",
+            "Jacobean",
+            "Kona",
+            "Medium Walnut",
+            "Natural",
+            "Provincial",
+            "Red Chestnut",
+            "Red Mahogany",
+            "Red Oak",
+            "Rosewood",
+            "Special Walnut",
+            "Weathered Oak"
+        ],
+        "Woods": [
+            "Alder",
+            "Ash",
+            "Aspen",
+            "Baltic Birch",
+            "Bamboo",
+            "Basswood",
+            "Beech",
+            "Birch",
+            "Black Walnut",
+            "Butternut",
+            "Cedar",
+            "Cherry",
+            "Cypress",
+            "Douglas Fir",
+            "Elm",
+            "Hickory",
+            "Koa",
+            "Mahogany",
+            "Maple",
+            "Meranti",
+            "MDF",
+            "Oak (Red)",
+            "Oak (White)",
+            "Okoume",
+            "Padauk",
+            "Pine",
+            "Poplar",
+            "Purple Heart",
+            "Redwood",
+            "Rosewood",
+            "Sapele",
+            "Spruce",
+            "Teak",
+            "Tulipwood",
+            "Walnut",
+            "Wenge",
+            "Yellow Pine",
+            "Zebrawood"
+        ]
+    };
+
+    // Build the preset select element with optgroups
+    function buildPresetSelect() {
+        const selectEl = document.createElement('select');
+        selectEl.style="width:10em"
+        const defaultOption = document.createElement('option');
+        defaultOption.textContent = "Select preset…";
+        defaultOption.value = "";
+        defaultOption.disabled = true;
+        defaultOption.selected = true;
+        selectEl.appendChild(defaultOption);
+
+        for (const groupName in presets) {
+            const optGroupEl = document.createElement('optgroup');
+            optGroupEl.label = groupName;
+            const groupData = presets[groupName];
+            groupData.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = preset;
+                option.textContent = preset;
+                optGroupEl.appendChild(option);
+            });
+      
+            selectEl.appendChild(optGroupEl);
+        }
+        return selectEl;
+    }
+</script>
+
+<!-- Global suggestions for pre-populating swatches -->
+<script>
+    const suggestions = [
+        "Oil-Based Poly\nSatin",
+        "Water-Based\nPoly Satin",
+        "Minwax Stain +\nPoly All-In-One",
+        "Danish Oil",
+        "Oil-Based Poly\nGloss",
+        "Oil Stain +\nPoly",
+        "Tung Oil",
+        "Oil-Based Poly\nMatte",
+        "Water-Based\nPoly Matte",
+        "Shellac",
+        "Minwax\nPolycrylic",
+        "Boiled Linseed\nOil",
+        "Gel Stain +\nWipe-On Poly",
+        "Pre-Stain +\nOil Stain +\nPoly",
+        "Spar Urethane",
+        "Paste Wax",
+        "Spray Lacquer",
+        "Chalk Paint +\nWax",
+        "Water-Based\nStain + Poly",
+        "Rubio Monocoat"
+    ];
+    let suggestionIndex = 0;
+</script>
+
+<!-- Main UI and swatch generation code -->
+<script>
+    const state = {swatches: [], nextId: 1};
+    const swatchListEl = document.getElementById('swatch-list');
+    const emptyMessageEl = document.getElementById('empty-message');
+    const previewContainerEl = document.getElementById('preview-container');
+    const addSwatchBtn = document.getElementById('add-swatch-btn');
+    const generateSvgBtn = document.getElementById('generate-svg-btn');
+
+    function createSwatchContent(parent, text) {
+        const shapePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        shapePath.setAttribute('d', "M18.16,72.16C8.226,72.16 0.16,64.094 0.16,54.16L0.16,18.16C0.16,8.226 8.226,0.16 18.16,0.16L174.16,0.16C184.094,0.16 192.16,8.226 192.16,18.16L192.16,54.16C192.16,64.094 184.094,72.16 174.16,72.16C184.094,72.16 192.16,80.226 192.16,90.16L192.16,174.16C192.16,184.094 184.094,192.16 174.16,192.16L18.16,192.16C8.226,192.16 0.16,184.094 0.16,174.16L0.16,90.16C0.16,80.226 8.226,72.16 18.16,72.16Z");
+        shapePath.setAttribute('style', 'fill:none;stroke:#f00;stroke-width:0.32px;');
+        parent.appendChild(shapePath);
+
+        const dividerPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        dividerPath.setAttribute('d', "M172.16,72.16L20.16,72.16");
+        dividerPath.setAttribute('style', 'fill:none;stroke:#400;stroke-width:0.32px;');
+        parent.appendChild(dividerPath);
+
+        const circleEl = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circleEl.setAttribute('cx', 96 * 2 - 10 - 17);
+        circleEl.setAttribute('cy', 96 * 3 / 4 + 10 + 17);
+        circleEl.setAttribute('r', '17');
+        circleEl.setAttribute('style', 'fill:#a400b5;');
+        parent.appendChild(circleEl);
+
+        const textWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        textWrapper.setAttribute('transform', 'translate(10, 0)');
+        const textGroup = renderSingleLineText(text, {width: 124.8, height: 90, color: '#400', strokeWidth: 0.32});
+        textWrapper.appendChild(textGroup);
+        parent.appendChild(textWrapper);
+    }
+
+    function createSwatchSvg(swatch) {
+        const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('width', '193px');
+        svgEl.setAttribute('height', '193px');
+        svgEl.setAttribute('viewBox', '0 0 193 193');
+        svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        svgEl.setAttribute('style', 'fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;');
+        createSwatchContent(svgEl, swatch.text);
+        return svgEl;
+    }
+
+    function renderPreview() {
+        previewContainerEl.innerHTML = '';
+        if (state.swatches.length === 0) return;
+        const swatchWidthInches = 2;
+        const spacingInches = 0.1;
+        const maxGridWidthInches = 19;
+        const maxSwatchesPerRow = Math.floor((maxGridWidthInches + spacingInches) / (swatchWidthInches + spacingInches));
+        const rows = Math.ceil(state.swatches.length / maxSwatchesPerRow);
+        const cols = Math.min(state.swatches.length, maxSwatchesPerRow);
+        const totalWidthInches = cols * swatchWidthInches + (cols - 1) * spacingInches;
+        const totalHeightInches = rows * swatchWidthInches + (rows - 1) * spacingInches;
+        const pxPerInch = 96;
+        const widthPx = totalWidthInches * pxPerInch;
+        const heightPx = totalHeightInches * pxPerInch;
+        const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('width', widthPx.toString());
+        svgEl.setAttribute('height', heightPx.toString());
+        svgEl.setAttribute('viewBox', `0 0 ${widthPx} ${heightPx}`);
+        svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        svgEl.setAttribute('id', 'preview-svg');
+
+        state.swatches.forEach((swatch, i) => {
+            const row = Math.floor(i / maxSwatchesPerRow);
+            const col = i % maxSwatchesPerRow;
+            const x = col * (swatchWidthInches + spacingInches) * pxPerInch;
+            const y = row * (swatchWidthInches + spacingInches) * pxPerInch;
+            const groupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            groupEl.setAttribute('transform', `translate(${x}, ${y})`);
+            groupEl.setAttribute('class', `swatch-preview-${swatch.id}`);
+            const innerSvgEl = createSwatchSvg(swatch);
+            groupEl.appendChild(innerSvgEl);
+            svgEl.appendChild(groupEl);
+        });
+
+        previewContainerEl.appendChild(svgEl);
+    }
+
+    function addSwatch() {
+        const suggestion = suggestions[suggestionIndex];
+        suggestionIndex = (suggestionIndex + 1) % suggestions.length;
+        const swatch = {id: state.nextId++, text: suggestion};
+        state.swatches.push(swatch);
+        renderSwatchList();
+        renderPreview();
+    }
+
+    function updateSwatch(id, text) {
+        const index = state.swatches.findIndex(s => s.id === id);
+        if (index !== -1) {
+            state.swatches[index].text = text;
+            const swatchEditor = document.querySelector(`.swatch-editor[data-id="${id}"]`);
+            if (swatchEditor) {
+                const previewContainer = swatchEditor.querySelector('.swatch-preview');
+                if (previewContainer) {
+                    previewContainer.innerHTML = '';
+                    previewContainer.appendChild(createSwatchSvg(state.swatches[index]));
+                }
+            }
+            renderPreview();
+        }
+    }
+
+    function deleteSwatch(id) {
+        state.swatches = state.swatches.filter(s => s.id !== id);
+        renderSwatchList();
+        renderPreview();
+    }
+
+    function renderSwatchList() {
+        swatchListEl.innerHTML = '';
+        if (state.swatches.length === 0) {
+            swatchListEl.appendChild(emptyMessageEl);
+            return;
+        }
+        state.swatches.forEach(swatch => {
+            const swatchEditorEl = document.createElement('div');
+            swatchEditorEl.className = 'swatch-editor';
+            swatchEditorEl.dataset.id = swatch.id;
+
+            const headingEl = document.createElement('h3');
+            headingEl.textContent = `Swatch #${swatch.id}`;
+            swatchEditorEl.appendChild(headingEl);
+
+            // Add preset dropdown next to the heading
+            const presetSelect = buildPresetSelect();
+            presetSelect.addEventListener('change', e => {
+                const newVal = e.target.value;
+                // Update the textarea with the selected preset text
+                textareaEl.value = newVal;
+                updateSwatch(swatch.id, newVal);
+                validateTextarea(textareaEl, swatch.id);
+                // Reset dropdown to default
+                presetSelect.selectedIndex = 0;
+            });
+            swatchEditorEl.append(document.createElement("br"))
+            swatchEditorEl.append(document.createTextNode("Type your text or "))
+            swatchEditorEl.appendChild(presetSelect);
+
+            const textareaEl = document.createElement('textarea');
+            textareaEl.value = swatch.text;
+            textareaEl.placeholder = `Enter up to ${MAX_LINES} lines\n(15 chars per line max)`;
+            textareaEl.addEventListener('input', e => {
+                updateSwatch(swatch.id, e.target.value);
+                validateTextarea(textareaEl, swatch.id);
+            });
+            swatchEditorEl.appendChild(textareaEl);
+
+            const charCountEl = document.createElement('div');
+            charCountEl.className = 'character-count';
+            swatchEditorEl.appendChild(charCountEl);
+
+            const errorEl = document.createElement('div');
+            errorEl.className = 'error';
+            swatchEditorEl.appendChild(errorEl);
+
+            const previewEl = document.createElement('div');
+            previewEl.className = 'swatch-preview';
+            previewEl.appendChild(createSwatchSvg(swatch));
+            swatchEditorEl.appendChild(previewEl);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.style.backgroundColor = '#d93025';
+            deleteBtn.style.marginTop = '10px';
+            deleteBtn.addEventListener('click', () => deleteSwatch(swatch.id));
+            swatchEditorEl.appendChild(deleteBtn);
+
+            validateTextarea(textareaEl, swatch.id);
+            swatchListEl.appendChild(swatchEditorEl);
+        });
+    }
+
+    function validateTextarea(textareaEl, swatchId) {
+        const text = textareaEl.value;
+        const lines = text.split('\n');
+        const charCountEl = textareaEl.nextElementSibling;
+        const errorEl = charCountEl.nextElementSibling;
+        charCountEl.textContent = `${lines.length}/${MAX_LINES} lines used`;
+        errorEl.innerHTML = '';
+        let hasError = false;
+        if (lines.length > MAX_LINES) {
+            const errorLineEl = document.createElement('p');
+            errorLineEl.textContent = `Error: Maximum ${MAX_LINES} lines allowed`;
+            errorEl.appendChild(errorLineEl);
+            hasError = true;
+        }
+        lines.forEach((line, i) => {
+            if (line.length > 15) {
+                const errorLineEl = document.createElement('p');
+                errorLineEl.textContent = `Line ${i + 1} exceeds 15 characters (${line.length})`;
+                errorEl.appendChild(errorLineEl);
+                hasError = true;
+            }
+        });
+        errorEl.style.display = hasError ? 'block' : 'none';
+    }
+
+    function generateAndDownloadSVG() {
+        if (state.swatches.length === 0) {
+            alert('Please add at least one swatch first');
+            return;
+        }
+        const swatchWidthInches = 2;
+        const spacingInches = 0.1;
+        const maxGridWidthInches = 19;
+        const maxSwatchesPerRow = Math.floor((maxGridWidthInches + spacingInches) / (swatchWidthInches + spacingInches));
+        const rows = Math.ceil(state.swatches.length / maxSwatchesPerRow);
+        const cols = Math.min(state.swatches.length, maxSwatchesPerRow);
+        const totalWidthInches = cols * swatchWidthInches + (cols - 1) * spacingInches;
+        const totalHeightInches = rows * swatchWidthInches + (rows - 1) * spacingInches;
+        const pxPerInch = 96;
+        const widthPx = totalWidthInches * pxPerInch;
+        const heightPx = totalHeightInches * pxPerInch;
+        const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgEl.setAttribute('width', widthPx.toString());
+        svgEl.setAttribute('height', heightPx.toString());
+        svgEl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        svgEl.setAttribute('style', 'fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;');
+
+        state.swatches.forEach((swatch, i) => {
+            const row = Math.floor(i / maxSwatchesPerRow);
+            const col = i % maxSwatchesPerRow;
+            const x = col * (swatchWidthInches + spacingInches) * pxPerInch+1;
+            const y = row * (swatchWidthInches + spacingInches) * pxPerInch+1;
+            const groupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            groupEl.setAttribute('transform', `translate(${x}, ${y})`);
+            createSwatchContent(groupEl, swatch.text);
+            svgEl.appendChild(groupEl);
+        });
+
+        let svgContent = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n';
+        svgContent += '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n';
+        svgContent += svgEl.outerHTML;
+
+        const blob = new Blob([svgContent], {type: 'image/svg+xml'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'wood-finish-swatches.svg';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+    }
+
+    addSwatchBtn.addEventListener('click', addSwatch);
+    generateSvgBtn.addEventListener('click', generateAndDownloadSVG);
+    addSwatch();
+</script>
+</body>
+</html>
