@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/jigsawGenerator/hwr/static/css/main.3b5cee04.css",
+    "main.js": "/jigsawGenerator/hwr/static/js/main.c28669a6.js",
+    "index.html": "/jigsawGenerator/hwr/index.html",
+    "main.3b5cee04.css.map": "/jigsawGenerator/hwr/static/css/main.3b5cee04.css.map",
+    "main.c28669a6.js.map": "/jigsawGenerator/hwr/static/js/main.c28669a6.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.3b5cee04.css",
+    "static/js/main.c28669a6.js"
+  ]
+}
