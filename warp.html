@@ -826,8 +826,9 @@
     
     function parsePaths(d) {
         let pathSegments = d.split(/(?=[MmLlHhVvCcSsQqTtAaZzn])/);
-        let pieces = [];
-        let gather = (p) => { if (p) pieces.push(p); }
+        let subpaths = [];
+        let currentSubpath = [];
+        let gather = (p) => { if (p) currentSubpath.push(p); }
         // cursor
         let c = {x: 0, y: 0};
         let subpathStart = {x: 0, y: 0};
@@ -840,49 +841,57 @@
                 case 'n':  // none
                     break;
                 case 'M':
-                    // Move first, then update subpathStart
+                    if (currentSubpath.length) subpaths.push(currentSubpath);
+                    currentSubpath = [];
+                    // Always treat 'M' as a new subpath start
                     c.x = parseFloat(args.shift());
                     c.y = parseFloat(args.shift());
-                    subpathStart = {x: c.x, y: c.y};  // Fixed: Set after moving
+                    subpathStart = {x: c.x, y: c.y};  // <-- important
+                    prevControl = null;
+                
+                    // Treat additional coords as implicit 'L'
                     while (args.length >= 2) {
                         let x2 = parseFloat(args.shift());
                         let y2 = parseFloat(args.shift());
                         gather({
                             type: 'segment',
                             start: {x: c.x, y: c.y},
-                            end: {x: c.x = x2, y: c.y = y2}
+                            end: {x: x2, y: y2}
                         });
+                        c = {x: x2, y: y2};
                     }
-                    prevControl = null;
                     break;
                 case 'm':
-                    // Move first, then update subpathStart
-                    c.x += parseFloat(args[0]);
-                    c.y += parseFloat(args[1]);
-                    subpathStart = {x: c.x, y: c.y};  // Fixed: Set after moving
-                    while (args.length >= 2) {
-                        let x2 = parseFloat(args.shift());
-                        let y2 = parseFloat(args.shift());
-                        gather({
-                            type: 'segment',
-                            start: {x: c.x, y: c.y},
-                            end: {x: c.x += x2, y: c.y += y2}
-                        });
-                    }
+                    if (currentSubpath.length) subpaths.push(currentSubpath);
+                    currentSubpath = [];
+                    c.x += parseFloat(args.shift());
+                    c.y += parseFloat(args.shift());
+                    subpathStart = {x: c.x, y: c.y};  // <-- important
                     prevControl = null;
+
+                    while (args.length >= 2) {
+                        let dx = parseFloat(args.shift());
+                        let dy = parseFloat(args.shift());
+                        gather({
+                                   type: 'segment',
+                                   start: {x: c.x, y: c.y},
+                                   end: {x: c.x + dx, y: c.y + dy}
+                               });
+                        c.x += dx;
+                        c.y += dy;
+                    }
                     break;
                 case 'Z':
                 case 'z':
                 {
-                    let x2 = subpathStart.x;
-                    let y2 = subpathStart.y;
+                    // Instead of closing with a segment, gather a close token and push subpath
                     gather({
-                        type: 'segment',
-                        start: {x: c.x, y: c.y},
-                        end: {x: x2, y: y2}
+                        type: 'close'
                     });
-                    c.x = x2;  // Move cursor back to start
-                    c.y = y2;
+                    if (currentSubpath.length) subpaths.push(currentSubpath);
+                    currentSubpath = [];
+                    c.x = subpathStart.x;  // Move cursor back to start
+                    c.y = subpathStart.y;
                     // Fixed: Don't update subpathStart here
                 }
                     prevControl = null;
@@ -1036,7 +1045,8 @@
                     throw new Error("Path elements a,q,t not supported");
             }
         }
-        return pieces;
+        if (currentSubpath.length) subpaths.push(currentSubpath);
+        return subpaths;
     }
     
     function pathToString(path) {
@@ -1044,6 +1054,8 @@
             return `L ${path.end.x} ${path.end.y}`;
         } else if (path.type === 'cubic') {
             return `C ${path.control1.x} ${path.control1.y} ${path.control2.x} ${path.control2.y} ${path.end.x} ${path.end.y}`;
+        } else if (path.type === 'close') {
+            return 'Z';
         }
     }
     
@@ -1093,16 +1105,25 @@
                 const dContent = pathElement.getAttribute('d');
                 if (!dContent) return;
                 
-                // Parse the path into segments
+                // Parse the path into subpaths
                 const paths = parsePaths(dContent);
                 if (paths.length === 0) return;
                 
-                // Subdivide each path segment if needed
-                let result = `M ${paths[0].start.x} ${paths[0].start.y}`;
-                for (let path of paths) {
-                    const subdivided = subdividePath(path, threshold);
-                    for (let subpath of subdivided) {
-                        result += ' ' + pathToString(subpath);
+                // Subdivide each subpath and segment if needed
+                let result = "";
+                for (const subpath of paths) {
+                    if (!subpath.length) continue;
+                    const first = subpath[0];
+                    result += `M ${first.start.x} ${first.start.y}`;
+                    for (let path of subpath) {
+                        if (path.type === 'close') {
+                            result += ' Z';
+                        } else {
+                            const subdivided = subdividePath(path, threshold);
+                            for (let sub of subdivided) {
+                                result += ' ' + pathToString(sub);
+                            }
+                        }
                     }
                 }
                 
